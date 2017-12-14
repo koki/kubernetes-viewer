@@ -12,7 +12,11 @@ type Session struct {
 }
 
 type Convert struct {
+	URL         string `json:"url,omitempty"`
 	Unconverted string `json:"unconverted,omitempty"`
+
+	// error parsing the Convert request body.
+	RequestError string `json:"request_error,omitempty"`
 }
 
 type Login struct {
@@ -59,9 +63,11 @@ func MkSession(sessionValues map[interface{}]interface{}) *Session {
 	}
 }
 
-func MkConvert(unconverted string) *Convert {
+func MkConvert(url, unconverted, err string) *Convert {
 	return &Convert{
-		Unconverted: unconverted,
+		URL:          url,
+		Unconverted:  unconverted,
+		RequestError: err,
 	}
 }
 
