@@ -3,7 +3,7 @@ const serverURL = 'KOKI_SHORT_SERVER_URL';
 function sendRequest(body, onSuccess, onError) {
     let xhr = new XMLHttpRequest();
     xhr.open('POST', `${serverURL}/convert`, true);
-    xhr.setRequestHeader('Content-Type', 'application/yaml');
+    xhr.setRequestHeader('Content-Type', 'application/json');
     xhr.setRequestHeader('Access-Control-Allow-Origin', `${serverURL}/`);
     xhr.onload = (e) => {
         if (xhr.readyState === 4) {
@@ -26,7 +26,7 @@ function sendRequest(body, onSuccess, onError) {
         });
     };
 
-    xhr.send(body);
+    xhr.send(JSON.stringify(body));
 }
 
 function checkCookies(onSuccess, onFailure) {
@@ -74,12 +74,12 @@ chrome.runtime.onConnect.addListener(function(port) {
     }
 
     port.onMessage.addListener(function(info) {
-        if (info.fileLines) {
-            doConversion(info.fileLines);
+        if (info.linesRequest) {
+            doConversion(info.linesRequest);
         }
     });
 
-    function doConversion(fileLines) {
+    function doConversion(request) {
         let attemptedSignIn = false;
         checkCookies(doSendRequest, () => {
             attemptedSignIn = true;
@@ -91,7 +91,10 @@ chrome.runtime.onConnect.addListener(function(port) {
         });
 
         function doSendRequest() {
-            sendRequest(fileLines.join('\n'), sendSuccessResponse, (error) => {
+            sendRequest({
+                url: request.url,
+                yaml: request.lines.join('\n')
+            }, sendSuccessResponse, (error) => {
                 if (error.status == 401 && !attemptedSignIn) {
                     // Attempt to sign in and try again.
                     attemptedSignIn = true;

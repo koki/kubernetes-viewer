@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"io"
@@ -258,12 +259,34 @@ func login(rw http.ResponseWriter, r *http.Request) {
 	http.Redirect(rw, r, url, 302)
 }
 
-func mkConvertLog(sessionValues map[interface{}]interface{}, unconverted string, err error) logging.Log {
+type ConvertBody struct {
+	URL  string `json:"url,omitempty"`
+	YAML string `json:"yaml"`
+
+	// ParseError should only be caused by old versions of the chrome extension.
+	ParseError string `json:"-"`
+}
+
+func mkConvertLog(sessionValues map[interface{}]interface{}, body ConvertBody, err error) logging.Log {
 	return logging.Log{
 		Session: logging.MkSession(sessionValues),
-		Convert: logging.MkConvert(unconverted),
+		Convert: logging.MkConvert(body.URL, body.YAML, body.ParseError),
 		Error:   logging.MkError(err),
 	}
+}
+
+func parseConvertBody(data []byte) ConvertBody {
+	body := ConvertBody{}
+	err := json.Unmarshal(data, &body)
+	if err != nil {
+		// Maybe it's an old version of the chrome extension.
+		return ConvertBody{
+			YAML:       string(data),
+			ParseError: err.Error(),
+		}
+	}
+
+	return body
 }
 
 func convert(rw http.ResponseWriter, r *http.Request) {
@@ -271,14 +294,14 @@ func convert(rw http.ResponseWriter, r *http.Request) {
 	sesh, err := store.Get(r, "user")
 	if err != nil {
 		http.Error(rw, "invalid cookie", http.StatusUnauthorized)
-		logging.WriteLog(mkConvertLog(sesh.Values, "", fmt.Errorf("unauthorized")))
+		logging.WriteLog(mkConvertLog(sesh.Values, ConvertBody{}, fmt.Errorf("unauthorized")))
 		return
 	}
 
 	_, hasID := sesh.Values["id"]
 	if sesh.IsNew || !hasID {
 		http.Error(rw, "unauthorized", http.StatusUnauthorized)
-		logging.WriteLog(mkConvertLog(sesh.Values, "", fmt.Errorf("unauthorized")))
+		logging.WriteLog(mkConvertLog(sesh.Values, ConvertBody{}, fmt.Errorf("unauthorized")))
 		return
 	}
 
@@ -294,30 +317,32 @@ func convert(rw http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
 		http.Error(rw, "", http.StatusMethodNotAllowed)
-		logging.WriteLog(mkConvertLog(sesh.Values, "", fmt.Errorf("method not allowed")))
+		logging.WriteLog(mkConvertLog(sesh.Values, ConvertBody{}, fmt.Errorf("method not allowed")))
 		return
 	}
 
 	headers := rw.Header()
-	unconvertedBytes, err := ioutil.ReadAll(r.Body)
+	bodyBytes, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		logging.WriteLog(mkConvertLog(sesh.Values, "", err))
+		logging.WriteLog(mkConvertLog(sesh.Values, ConvertBody{}, err))
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
-	streams := []io.ReadCloser{ioutil.NopCloser(bytes.NewReader(unconvertedBytes))}
-	unconverted := string(unconvertedBytes)
+
+	body := parseConvertBody(bodyBytes)
+
+	streams := []io.ReadCloser{ioutil.NopCloser(bytes.NewReader([]byte(body.YAML)))}
 
 	objs, err := parser.ParseStreams(streams)
 	if err != nil {
-		logging.WriteLog(mkConvertLog(sesh.Values, unconverted, err))
+		logging.WriteLog(mkConvertLog(sesh.Values, body, err))
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
 
 	kokiObjs, err := converter.ConvertToKokiNative(objs)
 	if err != nil {
-		logging.WriteLog(mkConvertLog(sesh.Values, unconverted, err))
+		logging.WriteLog(mkConvertLog(sesh.Values, body, err))
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
@@ -333,11 +358,11 @@ func convert(rw http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
-		logging.WriteLog(mkConvertLog(sesh.Values, unconverted, err))
+		logging.WriteLog(mkConvertLog(sesh.Values, body, err))
 		return
 	}
 
-	logging.WriteLog(mkConvertLog(sesh.Values, unconverted, nil))
+	logging.WriteLog(mkConvertLog(sesh.Values, body, nil))
 }
 
 func mkLoginLog(sessionValues map[interface{}]interface{}, err error) logging.Log {

@@ -20,7 +20,10 @@ function main() {
     const kubeLines = getLinesFromRows(kubeRows);
 
     const kokiRows = new Promise((resolve, reject) => {
-        sendFileContents(kubeLines, (content) => {
+        sendFileContents({
+            url: window.location.href,
+            lines: kubeLines
+        }, (content) => {
             resolve(buildRowsForContent(content));
         }, reject);
     });
@@ -107,10 +110,10 @@ function updateFileWithInfo(fileInfo, fileData) {
     $('#pretty-yaml-data').text(fileData);
 }
 
-function sendFileContents(lines, onSuccess, onError) {
+function sendFileContents(request, onSuccess, onError) {
     const port = chrome.runtime.connect();
     port.postMessage({
-        fileLines: lines
+        linesRequest: request
     });
     port.onMessage.addListener(function(msg) {
         if (msg.error) {
