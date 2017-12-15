@@ -1,9 +1,14 @@
 {
     "manifest_version": 2,
-    "name": "Koki Short Github Viewer",
-    "version": "0.2.0",
+    "name": "Koki Kubernetes Viewer",
+    "version": "0.3.2",
 
     "description": "Prettifies Kubernetes YAML viewed on Github",
+    "icons": {
+        "128": "128x128.png",
+        "288": "288x288.png",
+        "576": "576x576.png"
+    },
     "content_scripts": [{
         "matches": ["http://github.com/*", "https://github.com/*"],
         "js": [
