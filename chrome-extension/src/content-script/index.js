@@ -7,7 +7,8 @@ import hljs from 'highlight.js';
 githubInjection(window, err => {
     if (!err &&
         ghPageType(window.location.href, ghPageType.REPOSITORY_BLOB) &&
-        $('.final-path').text().endsWith('.yaml') &&
+        ($('.final-path').text().endsWith('.yaml') ||
+            $('.final-path').text().endsWith('.yml')) &&
         $('#toggle-yaml').length <= 0 &&
         isKubeYaml(getLinesFromRows(getFileRows()))) {
         main();

@@ -76,8 +76,14 @@ gulp.task('build-manifest', () => {
         .pipe(gulp.dest(buildDir));
 });
 
+gulp.task('copy-files', () => {
+    return gulp
+        .src(`${sourceDir}/*.png`)
+        .pipe(gulp.dest(buildDir));
+});
+
 gulp.task('build', ['clean'], done => {
-    runSequence(['build-content-script-js', 'build-content-script-css', 'build-background-script-js', 'build-manifest'], done);
+    runSequence(['build-content-script-js', 'build-content-script-css', 'build-background-script-js', 'build-manifest', 'copy-files'], done);
 });
 
 gulp.task('watch', ['build'], () => {
